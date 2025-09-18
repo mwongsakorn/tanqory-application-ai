@@ -22,10 +22,10 @@ import * as Haptics from 'expo-haptics';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const quickPrompts = [
-  'ช่วยออกแบบ onboarding flow ให้แอปใหม่',
-  'เสนอไอเดียเพิ่ม retention ของผู้ใช้ประจำ',
-  'อธิบายโครงสร้าง API ของ Tanqory Platform',
-  'ช่วยสร้างแผน loyalty program สำหรับลูกค้า',
+  'สรุปจุดเด่นของ Company Memory ที่ควรรู้ภายใน 5 bullet',
+  'ช่วยวาง flow เปิดตัวฟีเจอร์ใหม่ให้ Tanqory พร้อม KPI ติดตาม',
+  'แนะนำวิธีออกแบบ API ให้รองรับ multi-tenant อย่างปลอดภัย',
+  'เสนอแผน retention 90 วัน สำหรับลูกค้าเดิมพร้อม automation ที่เกี่ยวข้อง',
 ];
 
 export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList, 'Chat'>) {
