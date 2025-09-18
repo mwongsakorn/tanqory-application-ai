@@ -8,6 +8,7 @@ import { ChatComposer } from '@/components/ChatComposer';
 import { ChatMessage, ChatMessageBubble } from '@/components/ChatMessageBubble';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { fetchAssistantReply } from '@/services/openai';
+import * as Haptics from 'expo-haptics';
 
 const quickPrompts = [
   'ช่วยคิด workflow จัดการสินค้าใหม่',
@@ -29,6 +30,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const userInitials = useMemo(() => {
@@ -49,6 +51,10 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
 
   const handleSend = useCallback(
     (content: string) => {
+      if (isSending) {
+        return;
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
@@ -59,6 +65,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
 
       setMessages((current) => [...current, userMessage]);
       setIsTyping(true);
+      setIsSending(true);
       scrollToLatest();
 
       (async () => {
@@ -72,6 +79,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
             animate: true,
           };
           setMessages((current) => [...current, reply]);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
         } catch (error) {
           console.error('AI reply failed', error);
           const errorMessage: ChatMessage = {
@@ -82,23 +90,30 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
             animate: false,
           };
           setMessages((current) => [...current, errorMessage]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
         } finally {
           setIsTyping(false);
+          setIsSending(false);
           scrollToLatest();
         }
       })();
     },
-    [email, persona, scrollToLatest, userName],
+    [email, isSending, persona, scrollToLatest, userName],
   );
 
   const handleQuickPrompt = useCallback(
     (prompt: string) => {
+      if (isSending) {
+        return;
+      }
+      Haptics.selectionAsync().catch(() => undefined);
       handleSend(prompt);
     },
-    [handleSend],
+    [handleSend, isSending],
   );
 
   const handleReset = useCallback(() => {
+    Haptics.selectionAsync().catch(() => undefined);
     setMessages([
       {
         id: `welcome-${Date.now()}`,
@@ -202,7 +217,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
               { paddingBottom: composerPaddingBottom },
             ]}
           >
-            <ChatComposer onSend={handleSend} onFocus={scrollToLatest} />
+            <ChatComposer onSend={handleSend} onFocus={scrollToLatest} isSending={isSending} />
           </View>
         </View>
       </KeyboardAvoidingView>

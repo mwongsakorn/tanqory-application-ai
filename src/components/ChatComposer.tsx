@@ -1,24 +1,34 @@
 import { useCallback, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { colors, spacing } from '@/theme';
 
 interface ChatComposerProps {
   onSend: (message: string) => void;
   onFocus?: () => void;
+  isSending?: boolean;
 }
 
-export function ChatComposer({ onSend, onFocus }: ChatComposerProps) {
+export function ChatComposer({ onSend, onFocus, isSending = false }: ChatComposerProps) {
   const [value, setValue] = useState('');
 
   const handleSend = useCallback(() => {
     const trimmed = value.trim();
-    if (!trimmed) {
+    if (!trimmed || isSending) {
       return;
     }
 
     onSend(trimmed);
     setValue('');
-  }, [onSend, value]);
+  }, [isSending, onSend, value]);
 
   return (
     <KeyboardAvoidingView
@@ -33,10 +43,23 @@ export function ChatComposer({ onSend, onFocus }: ChatComposerProps) {
           placeholderTextColor="#6C6F75"
           multiline
           onFocus={onFocus}
+          editable={!isSending}
           style={styles.input}
         />
-        <Pressable style={({ pressed }) => [styles.sendButton, pressed && styles.pressed]} onPress={handleSend}>
-          <Text style={styles.sendLabel}>ส่ง</Text>
+        <Pressable
+          disabled={isSending || value.trim().length === 0}
+          style={({ pressed }) => [
+            styles.sendButton,
+            (isSending || value.trim().length === 0) && styles.sendButtonDisabled,
+            pressed && !isSending && value.trim().length > 0 && styles.pressed,
+          ]}
+          onPress={handleSend}
+        >
+          {isSending ? (
+            <ActivityIndicator size="small" color={colors.secondary} />
+          ) : (
+            <Text style={styles.sendLabel}>ส่ง</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -66,6 +89,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     marginLeft: spacing.md,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#3A3D44',
   },
   sendLabel: {
     fontWeight: '700',

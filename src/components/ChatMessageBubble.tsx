@@ -52,14 +52,18 @@ export function ChatMessageBubble({
     setDisplayedText('');
     setIsAnimating(true);
     let index = 0;
+    const totalLength = text.length;
+    const step = totalLength > 240 ? 3 : totalLength > 120 ? 2 : 1;
+    const intervalMs = totalLength > 240 ? 12 : totalLength > 120 ? 14 : 18;
     const interval = setInterval(() => {
-      index += 1;
-      setDisplayedText(text.slice(0, index));
-      if (index >= text.length) {
+      index += step;
+      const nextValue = text.slice(0, Math.min(index, totalLength));
+      setDisplayedText(nextValue);
+      if (index >= totalLength) {
         clearInterval(interval);
         setIsAnimating(false);
       }
-    }, 18);
+    }, intervalMs);
 
     return () => {
       clearInterval(interval);

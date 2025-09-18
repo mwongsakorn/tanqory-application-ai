@@ -2,6 +2,8 @@ import { Asset } from 'expo-asset';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { memoryModules } from '@/memory/manifest';
 
+let cachedMemoryPromise: Promise<string> | null = null;
+
 async function loadModuleContent(moduleId: number): Promise<string> {
   const asset = Asset.fromModule(moduleId);
   if (!asset.localUri) {
@@ -26,11 +28,19 @@ function sanitizeChunk(text: string) {
 }
 
 export async function loadCompanyMemory(): Promise<string> {
-  const contents = await Promise.all(memoryModules.map((moduleId) => loadModuleContent(moduleId)));
-  const merged = contents
-    .map(sanitizeChunk)
-    .filter(Boolean)
-    .join('\n\n---\n\n');
-  const maxChars = 6000;
-  return merged.length > maxChars ? `${merged.slice(0, maxChars)}\n\n[Memory truncated]` : merged;
+  if (cachedMemoryPromise) {
+    return cachedMemoryPromise;
+  }
+
+  cachedMemoryPromise = (async () => {
+    const contents = await Promise.all(memoryModules.map((moduleId) => loadModuleContent(moduleId)));
+    const merged = contents
+      .map(sanitizeChunk)
+      .filter(Boolean)
+      .join('\n\n---\n\n');
+    const maxChars = 6000;
+    return merged.length > maxChars ? `${merged.slice(0, maxChars)}\n\n[Memory truncated]` : merged;
+  })();
+
+  return cachedMemoryPromise;
 }
