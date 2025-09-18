@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing } from '@/theme';
 
 export interface ChatMessage {
@@ -13,16 +14,18 @@ export interface ChatMessage {
 
 interface ChatMessageBubbleProps {
   message: ChatMessage;
-  showAvatar?: boolean;
   assistantInitials?: string;
   userInitials?: string;
+  feedback?: 'up' | 'down' | null;
+  onFeedback?: (value: 'up' | 'down') => void;
 }
 
 export function ChatMessageBubble({
   message,
-  showAvatar = true,
   assistantInitials = 'AI',
   userInitials = 'YOU',
+  feedback = null,
+  onFeedback,
 }: ChatMessageBubbleProps) {
   const isAssistant = message.role === 'assistant';
   const shouldAnimate = isAssistant && Boolean(message.animate);
@@ -74,13 +77,6 @@ export function ChatMessageBubble({
     const caret = useMemo(() => (isAnimating ? '\u258C' : ''), [isAnimating]);
     return (
       <View style={styles.assistantRow}>
-        {showAvatar ? (
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLabel}>{assistantInitials}</Text>
-          </View>
-        ) : (
-          <View style={styles.avatarPlaceholder} />
-        )}
         <View style={styles.assistantContent}>
           <LinearGradient
             colors={['#1F2125', '#14161A']}
@@ -94,6 +90,23 @@ export function ChatMessageBubble({
               {caret}
             </Text>
             <Text style={styles.timestamp}>{formattedTime}</Text>
+            <Text style={styles.memoryTag}>ข้อมูลจาก Company Memory</Text>
+            {onFeedback ? (
+              <View style={styles.feedbackRow}>
+                <FeedbackButton
+                  icon="thumb-up-outline"
+                  activeIcon="thumb-up"
+                  isActive={feedback === 'up'}
+                  onPress={() => onFeedback('up')}
+                />
+                <FeedbackButton
+                  icon="thumb-down-outline"
+                  activeIcon="thumb-down"
+                  isActive={feedback === 'down'}
+                  onPress={() => onFeedback('down')}
+                />
+              </View>
+            ) : null}
           </LinearGradient>
         </View>
       </View>
@@ -114,13 +127,6 @@ export function ChatMessageBubble({
           <Text style={[styles.timestamp, styles.userTimestamp]}>{formattedTime}</Text>
         </LinearGradient>
       </View>
-      {showAvatar ? (
-        <View style={styles.userAvatar}>
-          <Text style={styles.userAvatarLabel}>{userInitials}</Text>
-        </View>
-      ) : (
-        <View style={styles.avatarPlaceholder} />
-      )}
     </View>
   );
 }
@@ -130,23 +136,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: spacing.lg,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  avatarPlaceholder: {
-    width: 36,
-    marginRight: spacing.sm,
-  },
-  avatarLabel: {
-    fontWeight: '700',
-    color: colors.secondary,
   },
   assistantContent: {
     flex: 1,
@@ -165,6 +154,11 @@ const styles = StyleSheet.create({
   assistantText: {
     color: '#FFFFFF',
     lineHeight: 21,
+  },
+  memoryTag: {
+    marginTop: spacing.xs,
+    fontSize: 11,
+    color: '#8A8D91',
   },
   userRow: {
     flexDirection: 'row',
@@ -197,18 +191,48 @@ const styles = StyleSheet.create({
   userTimestamp: {
     color: '#2F3238',
   },
-  userAvatar: {
+  feedbackRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+  },
+  feedbackButton: {
     width: 32,
     height: 32,
-    borderRadius: 12,
-    backgroundColor: '#282B30',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2D32',
+    backgroundColor: '#1A1C21',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
   },
-  userAvatarLabel: {
-    color: '#F7FF9C',
-    fontWeight: '700',
-    fontSize: 12,
+  feedbackPressed: {
+    opacity: 0.8,
+  },
+  feedbackActive: {
+    backgroundColor: 'rgba(225,255,0,0.12)',
+    borderColor: colors.primary,
   },
 });
+
+interface FeedbackButtonProps {
+  icon: string;
+  activeIcon: string;
+  isActive: boolean;
+  onPress: () => void;
+}
+
+function FeedbackButton({ icon, activeIcon, isActive, onPress }: FeedbackButtonProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.feedbackButton, pressed && styles.feedbackPressed, isActive && styles.feedbackActive]}
+    >
+      <MaterialCommunityIcons
+        name={(isActive ? activeIcon : icon) as never}
+        size={18}
+        color={isActive ? colors.primary : '#8A8D91'}
+      />
+    </Pressable>
+  );
+}

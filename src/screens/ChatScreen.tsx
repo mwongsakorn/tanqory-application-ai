@@ -1,5 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+  Modal,
+  ScrollView,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RootStackParamList } from '@/types/navigation';
@@ -9,12 +19,13 @@ import { ChatMessage, ChatMessageBubble } from '@/components/ChatMessageBubble';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { fetchAssistantReply } from '@/services/openai';
 import * as Haptics from 'expo-haptics';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const quickPrompts = [
-  'ช่วยคิด workflow จัดการสินค้าใหม่',
-  'เสนอไอเดียเพิ่ม conversion ใน Checkout',
-  'อธิบายส่วนประกอบของ Shopify API',
-  'ช่วยสร้างแผน loyalty program',
+  'ช่วยออกแบบ onboarding flow ให้แอปใหม่',
+  'เสนอไอเดียเพิ่ม retention ของผู้ใช้ประจำ',
+  'อธิบายโครงสร้าง API ของ Tanqory Platform',
+  'ช่วยสร้างแผน loyalty program สำหรับลูกค้า',
 ];
 
 export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList, 'Chat'>) {
@@ -24,13 +35,16 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
     {
       id: 'welcome',
       role: 'assistant',
-      content: `สวัสดี ${userName}! ฉันคือ Tanqory AI พร้อมช่วยคุณ (${persona}) ออกแบบและพัฒนา Shopify App Demo ครบทุกฟีเจอร์. ต้องการโฟกัสเรื่องไหนก่อนดีครับ?`,
+      content: `สวัสดี ${userName}! ฉันคือ Tanqory AI พร้อมช่วยคุณ (${persona}) วางกลยุทธ์และพัฒนา Tanqory App Demo ให้ตอบโจทย์ธุรกิจ. อยากเริ่มต้นที่หัวข้อไหนก่อนดีครับ?`,
       timestamp: Date.now(),
       animate: false,
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [tone, setTone] = useState<'balanced' | 'detailed' | 'concise'>('balanced');
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, 'up' | 'down'>>({});
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const userInitials = useMemo(() => {
@@ -55,6 +69,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
         return;
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+      const historyBeforeSend = [...messages];
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
@@ -70,7 +85,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
 
       (async () => {
         try {
-          const replyText = await fetchAssistantReply(content, { userName, persona, email });
+          const replyText = await fetchAssistantReply(content, { userName, persona, email, tone }, [...historyBeforeSend, userMessage]);
           const reply: ChatMessage = {
             id: `assistant-${Date.now()}`,
             role: 'assistant',
@@ -79,6 +94,11 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
             animate: true,
           };
           setMessages((current) => [...current, reply]);
+          setFeedbackMap((prev) => {
+            const next = { ...prev };
+            delete next[reply.id];
+            return next;
+          });
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
         } catch (error) {
           console.error('AI reply failed', error);
@@ -98,7 +118,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
         }
       })();
     },
-    [email, isSending, persona, scrollToLatest, userName],
+    [email, isSending, messages, persona, scrollToLatest, tone, userName],
   );
 
   const handleQuickPrompt = useCallback(
@@ -118,12 +138,55 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
       {
         id: `welcome-${Date.now()}`,
         role: 'assistant',
-        content: `เริ่มแชทใหม่แล้วครับ ${userName}! แจ้งได้เลยว่าต้องการให้ Tanqory AI ช่วยเรื่องใดเกี่ยวกับ Shopify.`,
+        content: `เริ่มแชทใหม่แล้วครับ ${userName}! บอกได้เลยว่าต้องการให้ Tanqory AI ช่วยเรื่องใดเกี่ยวกับ Tanqory Platform หรือการพัฒนาแอป.`,
         timestamp: Date.now(),
         animate: false,
       },
     ]);
+    setFeedbackMap({});
+    setIsSending(false);
+    setIsTyping(false);
   }, [userName]);
+
+  const handleFeedback = useCallback((messageId: string, value: 'up' | 'down') => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setFeedbackMap((prev) => {
+      const existing = prev[messageId];
+      const next = { ...prev };
+      if (existing === value) {
+        delete next[messageId];
+      } else {
+        next[messageId] = value;
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSettings = useCallback(() => {
+    Haptics.selectionAsync().catch(() => undefined);
+    setSettingsVisible((prev) => !prev);
+  }, []);
+
+  const toneOptions: Array<{ id: 'balanced' | 'detailed' | 'concise'; label: string; description: string }> = useMemo(
+    () => [
+      {
+        id: 'balanced',
+        label: 'โหมดสมดุล',
+        description: 'ตอบครบถ้วนพร้อมสรุปสั้น ๆ เหมาะกับการตัดสินใจเร็ว',
+      },
+      {
+        id: 'detailed',
+        label: 'โหมดละเอียด',
+        description: 'แจกแจงขั้นตอนและตัวอย่างเชิงลึกเหมือนที่ปรึกษา',
+      },
+      {
+        id: 'concise',
+        label: 'โหมดสั้นกระชับ',
+        description: 'ตอบเป็น bullet หรือสรุปอย่างรวดเร็ว',
+      },
+    ],
+    [],
+  );
 
   const chatBackground = useMemo(() => ['#0C0D10', '#1A1C21'], []);
   const assistantInitials = 'AI';
@@ -178,10 +241,30 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
       >
         <View style={styles.container}>
           <View style={styles.banner}>
-            <Text style={styles.bannerTitle}>Tanqory AI Assistant</Text>
-            <Text style={styles.bannerSubtitle}>
-              บัญชี: {email} · บทบาท: {persona}
-            </Text>
+            <View style={styles.bannerRow}>
+              <View>
+                <Text style={styles.bannerTitle}>Tanqory AI</Text>
+              </View>
+              <View style={styles.bannerActions}>
+                <Pressable
+                  style={({ pressed }) => [styles.iconActionButton, pressed && styles.iconActionButtonPressed]}
+                  onPress={handleReset}
+                  accessibilityLabel="เริ่มบทสนทนาใหม่"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="plus" size={20} color={colors.primary} />
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.iconActionButton, pressed && styles.iconActionButtonPressed]}
+                  onPress={toggleSettings}
+                  accessibilityLabel="ตั้งค่าสำหรับคำตอบ"
+                  accessibilityRole="button"
+                >
+                  <MaterialCommunityIcons name="tune" size={20} color={colors.primary} />
+                </Pressable>
+              </View>
+            </View>
+            <Text style={styles.toneBadge}>{toneOptions.find((item) => item.id === tone)?.label}</Text>
           </View>
 
           <View style={[styles.chatArea, { backgroundColor: chatBackground[1] }]}
@@ -196,9 +279,10 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
                 return (
                   <ChatMessageBubble
                     message={item}
-                    showAvatar={isFirstOfGroup}
                     assistantInitials={assistantInitials}
                     userInitials={userInitials}
+                    feedback={feedbackMap[item.id] ?? null}
+                    onFeedback={item.role === 'assistant' ? (value) => handleFeedback(item.id, value) : undefined}
                   />
                 );
               }}
@@ -221,6 +305,45 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal visible={settingsVisible} transparent animationType="fade" onRequestClose={toggleSettings}>
+        <Pressable style={styles.modalOverlay} onPress={toggleSettings}>
+          <Pressable style={styles.modalContent} onPress={() => undefined}>
+            <Text style={styles.modalTitle}>ตั้งค่าการตอบกลับ</Text>
+            <Text style={styles.modalSubtitle}>ปรับโทนการตอบเพื่อให้เหมาะกับเวิร์กโฟลว์ของคุณ</Text>
+            <ScrollView>
+              {toneOptions.map((option) => {
+                const isActive = option.id === tone;
+                return (
+                  <Pressable
+                    key={option.id}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => undefined);
+                      setTone(option.id);
+                      setSettingsVisible(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.toneOption,
+                      isActive && styles.toneOptionActive,
+                      pressed && styles.toneOptionPressed,
+                    ]}
+                  >
+                    <View style={styles.toneOptionHeader}>
+                      <MaterialCommunityIcons
+                        name={isActive ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                        size={20}
+                        color={isActive ? colors.primary : '#8A8D91'}
+                      />
+                      <Text style={styles.toneOptionLabel}>{option.label}</Text>
+                    </View>
+                    <Text style={styles.toneOptionDescription}>{option.description}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -242,6 +365,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     paddingHorizontal: spacing.xl,
   },
+  bannerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   bannerTitle: {
     fontSize: 24,
     fontWeight: '700',
@@ -250,6 +378,29 @@ const styles = StyleSheet.create({
   bannerSubtitle: {
     color: '#B0B3B8',
     marginTop: spacing.xs,
+  },
+  bannerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconActionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#2A2D32',
+    backgroundColor: '#1A1C21',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
+  },
+  iconActionButtonPressed: {
+    opacity: 0.85,
+  },
+  toneBadge: {
+    marginTop: spacing.sm,
+    color: '#8A8D91',
+    fontSize: 13,
   },
   suggestionHeader: {
     paddingHorizontal: spacing.xl,
@@ -318,5 +469,57 @@ const styles = StyleSheet.create({
   },
   footerSpacer: {
     height: spacing.lg,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1A1C21',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.xl,
+    maxHeight: '70%',
+  },
+  modalTitle: {
+    color: colors.primary,
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    color: '#8A8D91',
+    marginTop: spacing.xs,
+    marginBottom: spacing.lg,
+  },
+  toneOption: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#2A2D32',
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    backgroundColor: '#111318',
+  },
+  toneOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(225,255,0,0.08)',
+  },
+  toneOptionPressed: {
+    opacity: 0.85,
+  },
+  toneOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  toneOptionLabel: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    marginLeft: spacing.sm,
+  },
+  toneOptionDescription: {
+    color: '#8A8D91',
+    fontSize: 13,
+    lineHeight: 18,
   },
 });

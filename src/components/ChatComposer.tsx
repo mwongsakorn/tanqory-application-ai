@@ -39,7 +39,7 @@ export function ChatComposer({ onSend, onFocus, isSending = false }: ChatCompose
         <TextInput
           value={value}
           onChangeText={setValue}
-          placeholder="ถาม Tanqory AI เกี่ยวกับ Shopify..."
+          placeholder="ถาม Tanqory AI เกี่ยวกับการสร้างโปรดักต์หรือเวิร์กโฟลว์..."
           placeholderTextColor="#6C6F75"
           multiline
           onFocus={onFocus}

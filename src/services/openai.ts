@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 import { loadCompanyMemory } from './memory';
+import type { ChatMessage } from '@/components/ChatMessageBubble';
 
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/responses';
 
@@ -7,6 +8,7 @@ interface ChatOptions {
   userName: string;
   persona: string;
   email: string;
+  tone: 'balanced' | 'detailed' | 'concise';
 }
 
 function getApiKey(): string | undefined {
@@ -51,7 +53,11 @@ function extractText(response: OpenAiResponse): string {
   return 'ฉันไม่สามารถสร้างคำตอบได้ในตอนนี้ ลองอีกครั้งภายหลังนะครับ.';
 }
 
-export async function fetchAssistantReply(message: string, options: ChatOptions): Promise<string> {
+export async function fetchAssistantReply(
+  message: string,
+  options: ChatOptions,
+  history: ChatMessage[],
+): Promise<string> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error('ยังไม่ได้ตั้งค่า API Key สำหรับ OpenAI (EXPO_PUBLIC_OPENAI_API_KEY)');
@@ -59,7 +65,21 @@ export async function fetchAssistantReply(message: string, options: ChatOptions)
 
   const memory = await loadCompanyMemory();
   const model = getModel();
-  const personaPrompt = `คุณคือ Tanqory AI ที่ช่วยเหลือทีมในบทบาท ${options.persona}. ผู้ใช้ชื่อ ${options.userName} (${options.email}). ตอบไทยและอ้างอิงข้อมูลใน Company Memory.`;
+  const tonePrompt = {
+    balanced: 'ตอบอย่างกระชับแต่ให้รายละเอียดสำคัญครบถ้วน',
+    detailed: 'ตอบแบบละเอียด มีขั้นตอนและตัวอย่างประกอบ',
+    concise: 'ตอบสั้น ๆ ตรงประเด็น สรุปให้เข้าใจง่าย',
+  }[options.tone];
+  const personaPrompt = `คุณคือ Tanqory AI ที่ช่วยเหลือทีมในบทบาท ${options.persona}. ผู้ใช้ชื่อ ${options.userName} (${options.email}). ${tonePrompt}. หากข้อมูลไม่พอให้แจ้งผู้ใช้และเสนอแนวทางต่อ. อ้างอิง Company Memory ที่ให้มาด้านล่างด้วย.`;
+
+  const conversation = history.slice(-6).map((item) => {
+    const role = item.role === 'assistant' ? 'assistant' : 'user';
+    const type = item.role === 'assistant' ? 'output_text' : 'input_text';
+    return {
+      role,
+      content: [{ type, text: item.content }],
+    };
+  });
 
   const payload = {
     model,
@@ -74,6 +94,7 @@ export async function fetchAssistantReply(message: string, options: ChatOptions)
           },
         ],
       },
+      ...conversation,
       {
         role: 'user',
         content: [{ type: 'input_text', text: message }],
