@@ -112,6 +112,22 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
 
   const chatBackground = useMemo(() => ['#0C0D10', '#1A1C21'], []);
   const assistantInitials = 'AI';
+  const keyboardOffset = useMemo(
+    () => (Platform.OS === 'ios' ? Math.max(insets.top, 16) : 0),
+    [insets.top],
+  );
+
+  const composerPaddingBottom = useMemo(
+    () => {
+      if (Platform.OS === 'ios') {
+        const adjusted = insets.bottom ? Math.max(insets.bottom - 14, spacing.xs) : spacing.xs;
+        return adjusted;
+      }
+      return spacing.xs;
+    },
+    [insets.bottom],
+  );
+
   const suggestionHeader = useMemo(
     () => (
       <View style={styles.suggestionHeader}>
@@ -143,7 +159,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
       <KeyboardAvoidingView
         style={styles.keyboardAvoider}
         behavior={Platform.select({ ios: 'padding', android: 'height' })}
-        keyboardVerticalOffset={Platform.select({ ios: 76, android: 0 }) ?? 0}
+        keyboardVerticalOffset={keyboardOffset}
       >
         <View style={styles.container}>
           <View style={styles.banner}>
@@ -183,7 +199,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
           <View
             style={[
               styles.composerContainer,
-              { paddingBottom: Math.max(insets.bottom, spacing.lg) },
+              { paddingBottom: composerPaddingBottom },
             ]}
           >
             <ChatComposer onSend={handleSend} onFocus={scrollToLatest} />
@@ -208,6 +224,7 @@ const styles = StyleSheet.create({
   },
   banner: {
     paddingTop: spacing.xl,
+    paddingBottom: spacing.xl,
     paddingHorizontal: spacing.xl,
   },
   bannerTitle: {
