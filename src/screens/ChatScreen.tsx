@@ -128,7 +128,7 @@ export function ChatScreen({ route }: NativeStackScreenProps<RootStackParamList,
   const chatBackground = useMemo(() => ['#0C0D10', '#1A1C21'], []);
   const assistantInitials = 'AI';
   const keyboardOffset = useMemo(
-    () => (Platform.OS === 'ios' ? Math.max(insets.top, 16) : 0),
+    () => (Platform.OS === 'ios' ? 0 : 0),
     [insets.top],
   );
 
